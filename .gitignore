@@ -1,0 +1,19 @@
+# Java
+*.class
+*.jar
+*.war
+*.iml
+target/
+
+# IDE
+.idea/
+*.log
+
+# System
+.DS_Store
+Thumbs.db
+
+# Maven wrapper
+.mvn/
+mvnw
+mvnw.cmd
