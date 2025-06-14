@@ -1,0 +1,13 @@
+server:
+  port: 8888
+
+spring:
+  cloud:
+    config:
+      server:
+        git:
+          uri: https://github.com/ibrahim89/ecommerce-config-repo.git
+          default-label: main
+          clone-on-start: true
+  application:
+    name: config-server
