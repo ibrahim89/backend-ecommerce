@@ -6,7 +6,7 @@ spring:
     config:
       server:
         git:
-          uri: https://github.com/ibrahim89/ecommerce-config-repo.git
+          uri: https://github.com/ibrahim89/ecommerce-config-repo
           default-label: main
           clone-on-start: true
   application:
