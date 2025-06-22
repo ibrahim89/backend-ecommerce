@@ -7,8 +7,20 @@ import lombok.*;
 @Builder
 public class UserDto {
     private Long id;
+
     private String username;
+
     private String email;
-    private String phoneNumber;
+
+    private String password;
+
+    private String firstName;
+
+    private String lastName;
+
+    private String phone;
+
+    private String address;
+
 
 }
