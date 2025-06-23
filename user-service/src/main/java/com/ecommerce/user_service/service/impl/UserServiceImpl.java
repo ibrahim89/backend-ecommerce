@@ -4,14 +4,18 @@ import com.ecommerce.user_service.dto.UserDto;
 import com.ecommerce.user_service.dto.request.ChangePasswordRequest;
 import com.ecommerce.user_service.dto.request.Login;
 import com.ecommerce.user_service.dto.request.SignUp;
+import com.ecommerce.user_service.dto.request.UserInformation;
 import com.ecommerce.user_service.dto.response.JwtResponseMessage;
 import com.ecommerce.user_service.entity.RoleName;
 import com.ecommerce.user_service.entity.User;
 import com.ecommerce.user_service.exception.custom.EmailOrUsernameNotFoundException;
+import com.ecommerce.user_service.exception.custom.PasswordNotFoundException;
 import com.ecommerce.user_service.exception.custom.PhoneNumberNotFoundException;
+import com.ecommerce.user_service.exception.custom.UserNotFoundException;
 import com.ecommerce.user_service.repository.UserRepository;
 import com.ecommerce.user_service.security.jwt.JwtProvider;
 import com.ecommerce.user_service.security.userprinciple.UserDetailService;
+import com.ecommerce.user_service.security.userprinciple.UserPrinciple;
 import com.ecommerce.user_service.service.RoleService;
 import com.ecommerce.user_service.service.UserService;
 
@@ -19,6 +23,10 @@ import org.modelmapper.ModelMapper;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
@@ -82,8 +90,56 @@ public  class UserServiceImpl implements UserService {
         };
     }
     @Override
-    public Mono<JwtResponseMessage> login(Login signInForm) {
-        return null;
+    public Mono<JwtResponseMessage> login(Login loginForm) {
+        return Mono.fromCallable(() -> {
+            String usernameOrEmail = loginForm.getUsername();
+            boolean isEmail = usernameOrEmail.contains("@gmail.com");
+
+            UserDetails userDetails;
+            if (isEmail) {
+                userDetails = userDetailsService.loadUserByEmail(usernameOrEmail);
+            } else {
+                userDetails = userDetailsService.loadUserByUsername(usernameOrEmail);
+            }
+
+            // check username
+            if (userDetails == null) {
+                throw new UserNotFoundException("User not found");
+            }
+
+            // Check password
+            if (!passwordEncoder.matches(loginForm.getPassword(), userDetails.getPassword())) {
+                throw new PasswordNotFoundException("Incorrect password");
+            }
+
+            Authentication authentication = new UsernamePasswordAuthenticationToken(
+                    userDetails,
+                    loginForm.getPassword(),
+                    userDetails.getAuthorities()
+            );
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+
+            String accessToken = jwtProvider.createToken(authentication);
+            String refreshToken = jwtProvider.createRefreshToken(authentication);
+
+            UserPrinciple userPrinciple = (UserPrinciple) userDetails;
+
+            return JwtResponseMessage.builder()
+                    .accessToken(accessToken)
+                    .refreshToken(refreshToken)
+                    .information(UserInformation.builder()
+                            .id(userPrinciple.id())
+                            .firstName(userPrinciple.firstName())
+                            .lastName(userPrinciple.lastName())
+                            .username(userPrinciple.username())
+                            .email(userPrinciple.email())
+                            .phone(userPrinciple.phone())
+                            .gender(userPrinciple.gender())
+                            .address(userPrinciple.address())
+                            .roles(userPrinciple.roles())
+                            .build())
+                    .build();
+        }).onErrorResume(Mono::error);
     }
 
     @Override
