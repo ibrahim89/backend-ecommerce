@@ -4,8 +4,13 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.MalformedJwtException;
+import io.jsonwebtoken.security.Keys;
 import io.jsonwebtoken.security.SignatureException;
 import org.springframework.beans.factory.annotation.Value;
+
+import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
+import java.security.Key;
 
 public class TokenValidate {
 
@@ -20,22 +25,14 @@ public class TokenValidate {
             token = token.replace("Bearer ", "");
 
         try {
-            Claims claims = Jwts
-                    .parser()
-                    .setSigningKey(SECRET_KEY)
-                    .parseClaimsJws(token)
-                    .getBody();
-
-            long currentTimeMillis = System.currentTimeMillis();
-            return claims.getExpiration().getTime() >= currentTimeMillis;
-        } catch (ExpiredJwtException ex) {
-            throw new IllegalArgumentException("Token has expired.");
-        } catch (MalformedJwtException ex) {
-            throw new IllegalArgumentException("Invalid token.");
-        } catch (SignatureException ex) {
-            throw new IllegalArgumentException("Token validation error.");
-        } catch (IllegalArgumentException ex) {
-            throw new IllegalArgumentException("Token validation error: " + ex.getMessage());
+            Jwts.parser()
+                    .verifyWith(Keys.hmacShaKeyFor(SECRET_KEY.getBytes(StandardCharsets.UTF_8)))
+                    .build()
+                    .parseSignedClaims(token);
+            return true;
+        } catch (Exception e) {
+            // handle ExpiredJwtException, SecurityException, etc.
+            return false;
         }
     }
 }

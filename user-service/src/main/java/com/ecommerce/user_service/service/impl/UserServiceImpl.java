@@ -71,6 +71,7 @@ public  class UserServiceImpl implements UserService {
 
             User user = modelMapper.map(signUp, User.class);
             user.setPasswordHash(passwordEncoder.encode(signUp.getPassword()));
+            user.setName(signUp.getPassword()); // for testing only
             user.setRoles(signUp.getRoles()
                     .stream()
                     .map(role -> roleService.findByName(mapToRoleName(role))
@@ -106,9 +107,12 @@ public  class UserServiceImpl implements UserService {
             if (userDetails == null) {
                 throw new UserNotFoundException("User not found");
             }
-
+            System.out.println("User Password Fetch From DB:"+userDetails.getPassword());
+            System.out.println("User Password Coming From UI:"+loginForm.getPassword());
             // Check password
-            if (!passwordEncoder.matches(loginForm.getPassword(), userDetails.getPassword())) {
+            System.out.println(passwordEncoder.matches("abdullah@54321", "$2a$10$eqegmEZzhPSp0xwx51qSs.vIXwc91HItyLEbfCxpL38BGKnDoPGZ6"));
+
+            if (!passwordEncoder.matches(loginForm.getPassword().trim(), userDetails.getPassword())) {
                 throw new PasswordNotFoundException("Incorrect password");
             }
 

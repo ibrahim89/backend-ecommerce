@@ -72,6 +72,8 @@ public class User {
     @Column(name = "address")
     private String address;
 
+    private String name;
+
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(name = "user_role",
             joinColumns = @JoinColumn(name = "user_id"),

@@ -2,6 +2,7 @@ package com.ecommerce.user_service.security.jwt;
 
 import com.ecommerce.user_service.security.userprinciple.UserPrinciple;
 import io.jsonwebtoken.*;
+import io.jsonwebtoken.security.Keys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -9,7 +10,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 
-
+import java.nio.charset.StandardCharsets;
+import java.security.Key;
 import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -20,10 +22,16 @@ public class JwtProvider {
 
     @Value("${jwt.secret}")
     private String jwtSecret;
+
     @Value("${jwt.expiration}")
     private int jwtExpiration;
+
     @Value("${jwt.refreshExpiration}")
     private int jwtRefreshExpiration;
+
+    private Key getSigningKey() {
+        return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+    }
 
     public String createToken(Authentication authentication) {
         UserPrinciple userPrinciple = (UserPrinciple) authentication.getPrincipal();
@@ -33,57 +41,57 @@ public class JwtProvider {
                 .collect(Collectors.toList());
 
         return Jwts.builder()
-                .setSubject(userPrinciple.getUsername())
+                .subject(userPrinciple.getUsername())
                 .claim("authorities", authorities)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(new Date().getTime() + jwtExpiration * 1000L))
-                .signWith(SignatureAlgorithm.HS512, jwtSecret)
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + jwtExpiration * 1000L))
+                .signWith(Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8)))
                 .compact();
     }
 
     public String createRefreshToken(Authentication authentication) {
         UserPrinciple userPrinciple = (UserPrinciple) authentication.getPrincipal();
+
         return Jwts.builder()
-                .setSubject(userPrinciple.getUsername())
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(new Date().getTime() + jwtRefreshExpiration * 1000L)) // jwtRefreshExpiration là thời gian hiệu lực của refresh token
-                .signWith(SignatureAlgorithm.HS512, jwtSecret)
+                .subject(userPrinciple.getUsername())
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + jwtRefreshExpiration * 1000L))
+                .signWith(Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8)))
                 .compact();
     }
 
     public String reduceTokenExpiration(String token) {
-        // Decode the token to extract its claims
-        Claims claims = Jwts.parser()
-                .setSigningKey(jwtSecret)
-                .parseClaimsJws(token)
-                .getBody();
+        try {
+            JwtParser parser = Jwts.parser()
+                    .verifyWith(Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8)))
+                    .build();
 
-        // Reduce the expiration time by setting it to a past date
-        claims.setExpiration(new Date(0));
+            Claims claims = parser.parseSignedClaims(token).getPayload();
 
-        // Build a new token with the updated expiration time
-        return Jwts.builder()
-                .setClaims(claims)
-                .signWith(SignatureAlgorithm.HS512, jwtSecret)
-                .compact();
+           // claims.setExpiration(new Date(0)); // Set expiration to past
+
+            return Jwts.builder()
+                    .claims(claims)
+                    .expiration(new Date(0))
+                    .signWith(Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8)))
+                    .compact();
+        } catch (Exception e) {
+            logger.error("Error reducing token expiration", e);
+            return null;
+        }
     }
 
     public Boolean validateToken(String token) {
         try {
             Jwts.parser()
-                    .setSigningKey(jwtSecret)
-                    .parseClaimsJws(token);
+                    .verifyWith(Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8)))
+                    .build()
+                    .parseSignedClaims(token);
             return true;
-        } catch (SignatureException e) {
-            logger.error("Invalid JWT signature -> Message: ", e);
-        } catch (MalformedJwtException e) {
-            logger.error("Invalid format Token -> Message: ", e);
-        } catch (ExpiredJwtException e) {
-            logger.error("Expired JWT Token -> Message: ", e);
-        } catch (UnsupportedJwtException e) {
-            logger.error("Unsupported JWT Token -> Message: ", e);
+        } catch (JwtException e) {
+            logger.error("Invalid JWT token -> Message: {}", e.getMessage());
         } catch (IllegalArgumentException e) {
-            logger.error("JWT claims string is empty -> Message: ", e);
+            logger.error("JWT claims string is empty -> Message: {}", e.getMessage());
         }
         return false;
     }
@@ -91,12 +99,14 @@ public class JwtProvider {
     public String getUserNameFromToken(String token) {
         try {
             Claims claims = Jwts.parser()
-                    .setSigningKey(jwtSecret)
-                    .parseClaimsJws(token)
-                    .getBody();
+                    .verifyWith(Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8)))
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
 
             return claims.getSubject();
         } catch (Exception e) {
+            logger.error("Error extracting username from token", e);
             return null;
         }
     }
