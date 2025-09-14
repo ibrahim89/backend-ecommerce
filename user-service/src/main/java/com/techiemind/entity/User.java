@@ -20,7 +20,6 @@ public class User {
     private Long userId;
     private String name;
     private String email;
-    //@Column(name = "password", nullable = false)
     private String password;
     private LocalDateTime createdAt;
 }
